@@ -1,0 +1,24 @@
+NOTICE — third-party anatomical assets
+
+This application’s source code is licensed separately (MIT). The bundled 3D
+meshes are not.
+
+1. BodyParts3D
+   BodyParts3D, © The Database Center for Life Science
+   licensed under CC Attribution 4.0 International
+   https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html
+
+2. Z-Anatomy
+   Z-Anatomy — The libre 3D atlas of anatomy
+   licensed under CC BY-SA 4.0
+   https://www.z-anatomy.com/
+   https://github.com/Z-Anatomy/Models-of-human-anatomy
+
+3. Browser-optimized GLB
+   Derived processing by hpfrei/body-anatomy-3d-viewer
+   licensed under CC BY-SA 4.0
+   https://github.com/hpfrei/body-anatomy-3d-viewer
+
+If you redistribute the mesh files or adaptations of them, keep the
+attribution above. Derivatives of the Z-Anatomy / hpfrei mesh must remain
+CC BY-SA 4.0.
