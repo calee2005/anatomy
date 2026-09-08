@@ -13,9 +13,12 @@ const emit = defineEmits<{
   camera: [kind: CameraKind]
   background: [id: BackgroundId]
   gizmo: [mode: 'rotate' | 'translate']
+  zoomIn: []
+  zoomOut: []
   reset: []
   save: []
   load: []
+  photo: []
 }>()
 </script>
 
@@ -31,7 +34,13 @@ const emit = defineEmits<{
       <button type="button" @click="emit('view', 'left')">左侧</button>
       <button type="button" @click="emit('view', 'right')">右侧</button>
       <button type="button" @click="emit('view', 'back')">后</button>
+      <button type="button" @click="emit('view', 'top')">顶</button>
       <button type="button" @click="emit('view', 'threeQuarter')">3/4</button>
+    </div>
+
+    <div class="group">
+      <button type="button" @click="emit('zoomIn')">拉近</button>
+      <button type="button" @click="emit('zoomOut')">推远</button>
     </div>
 
     <div class="group">
@@ -97,6 +106,7 @@ const emit = defineEmits<{
       <button type="button" @click="emit('reset')">重置姿势</button>
       <button type="button" @click="emit('save')">保存</button>
       <button type="button" @click="emit('load')">读取</button>
+      <button type="button" @click="emit('photo')">从照片</button>
     </div>
   </header>
 </template>

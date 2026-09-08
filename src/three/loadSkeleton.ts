@@ -9,6 +9,7 @@ import {
 } from 'three'
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { isTinyFragmentName } from '../data/joints'
 
 export interface BoneMesh extends Mesh {
   userData: {
@@ -36,7 +37,7 @@ export function isBoneObject(obj: Object3D): obj is BoneMesh {
 export function collectBoneMeshes(root: Object3D): BoneMesh[] {
   const bones: BoneMesh[] = []
   root.traverse((child) => {
-    if (!isBoneObject(child)) {
+    if (!isBoneObject(child) || isTinyFragmentName(child.name)) {
       if ((child as Mesh).isMesh) child.visible = false
       return
     }

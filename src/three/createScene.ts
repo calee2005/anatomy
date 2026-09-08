@@ -12,7 +12,7 @@ import {
   WebGLRenderer,
   type Camera,
 } from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
 
 export const BACKGROUNDS = {
@@ -23,7 +23,7 @@ export const BACKGROUNDS = {
 
 export type BackgroundId = keyof typeof BACKGROUNDS
 export type CameraKind = 'perspective' | 'orthographic'
-export type ViewPreset = 'front' | 'back' | 'left' | 'right' | 'threeQuarter'
+export type ViewPreset = 'front' | 'back' | 'left' | 'right' | 'top' | 'threeQuarter'
 
 export interface SceneBundle {
   scene: Scene
@@ -31,7 +31,7 @@ export interface SceneBundle {
   persp: PerspectiveCamera
   ortho: OrthographicCamera
   camera: Camera
-  orbit: OrbitControls
+  orbit: TrackballControls
   transform: TransformControls
   raycaster: Raycaster
   pointer: Vector2
@@ -86,13 +86,18 @@ export function createScene(container: HTMLElement): SceneBundle {
   rim.position.set(0, 2, -4)
   scene.add(rim)
 
-  const orbit = new OrbitControls(persp, renderer.domElement)
-  orbit.enableDamping = true
-  orbit.dampingFactor = 0.08
-  orbit.screenSpacePanning = true
+  const orbit = new TrackballControls(persp, renderer.domElement)
+  orbit.rotateSpeed = 2.0
+  orbit.zoomSpeed = 1.35
+  orbit.panSpeed = 0.55
+  orbit.dynamicDampingFactor = 0.16
   orbit.minDistance = 0.4
   orbit.maxDistance = 8
+  orbit.minZoom = 0.28
+  orbit.maxZoom = 12
+  orbit.keys = ['', '', '']
   orbit.target.set(0, 0, 0)
+  orbit.handleResize()
 
   const transform = new TransformControls(persp, renderer.domElement)
   transform.setMode('rotate')
@@ -131,6 +136,7 @@ export function resizeScene(bundle: SceneBundle, width: number, height: number):
   bundle.ortho.bottom = -frustum
   bundle.ortho.updateProjectionMatrix()
   bundle.renderer.setSize(width, height)
+  bundle.orbit.handleResize()
 }
 
 function orthoFrustum(bundle: SceneBundle): number {
@@ -147,6 +153,7 @@ export function setCameraKind(bundle: SceneBundle, kind: CameraKind): void {
   }
   next.position.copy(current.position)
   next.quaternion.copy(current.quaternion)
+  next.up.copy(current.up)
   bundle.camera = next
   bundle.cameraKind = kind
   bundle.orbit.object = next
@@ -184,19 +191,71 @@ export function applyViewPreset(
     case 'right':
       pos.set(t.x - d, t.y, t.z)
       break
+    case 'top':
+      pos.set(t.x, t.y + d, t.z)
+      break
     case 'threeQuarter':
       pos.set(t.x + d * 0.55, t.y + d * 0.18, t.z + d * 0.72)
       break
   }
+  if (preset === 'top') bundle.camera.up.set(0, 0, -1)
+  else bundle.camera.up.set(0, 1, 0)
   bundle.camera.position.copy(pos)
+  bundle.camera.lookAt(t)
+  settleTrackball(bundle.orbit)
   bundle.orbit.update()
+}
+
+const DOLLY_STEP = 1.2
+
+type TrackballInternals = TrackballControls & {
+  _lastAngle: number
+  _moveCurr: Vector2
+  _movePrev: Vector2
+  _zoomStart: Vector2
+  _zoomEnd: Vector2
+}
+
+function settleTrackball(orbit: TrackballControls): void {
+  const ball = orbit as TrackballInternals
+  ball._lastAngle = 0
+  ball._movePrev.copy(ball._moveCurr)
+  ball._zoomStart.set(0, 0)
+  ball._zoomEnd.copy(ball._zoomStart)
+}
+
+export function dollyCamera(bundle: SceneBundle, zoomIn: boolean): void {
+  const orbit = bundle.orbit
+  if (bundle.cameraKind === 'orthographic') {
+    const factor = zoomIn ? DOLLY_STEP : 1 / DOLLY_STEP
+    bundle.ortho.zoom = Math.min(
+      orbit.maxZoom,
+      Math.max(orbit.minZoom, bundle.ortho.zoom * factor),
+    )
+    bundle.ortho.updateProjectionMatrix()
+    orbit.update()
+    return
+  }
+
+  const eye = new Vector3().subVectors(bundle.camera.position, orbit.target)
+  const next = zoomIn ? eye.length() / DOLLY_STEP : eye.length() * DOLLY_STEP
+  const clamped = Math.min(orbit.maxDistance, Math.max(orbit.minDistance, next))
+  if (clamped < 1e-4) return
+  eye.setLength(clamped)
+  bundle.camera.position.copy(orbit.target).add(eye)
+  orbit.update()
 }
 
 export function frameTarget(bundle: SceneBundle, center: Vector3, height: number): void {
   bundle.orbit.target.copy(center)
   const dist = Math.max(height * 1.55, 1.2)
+  bundle.camera.up.set(0, 1, 0)
   bundle.camera.position.set(center.x + dist * 0.55, center.y + height * 0.12, center.z + dist)
-  bundle.orbit.minDistance = height * 0.2
-  bundle.orbit.maxDistance = height * 8
+  bundle.orbit.minDistance = height * 0.18
+  bundle.orbit.maxDistance = height * 10
+  bundle.orbit.minZoom = 0.28
+  bundle.orbit.maxZoom = 12
+  bundle.orbit.handleResize()
+  settleTrackball(bundle.orbit)
   bundle.orbit.update()
 }

@@ -21,7 +21,7 @@ const emit = defineEmits<{
   <aside class="panel">
     <section>
       <h2>关节</h2>
-      <p class="hint">点选骨骼或从列表选择，拖动 gizmo 摆姿势。肩胛可切换「平移肩胛」。</p>
+      <p class="hint">点选整组关节或从列表选择，拖动 gizmo 摆姿势。抬臂时肩胛会跟着动；肩胛可切换「平移肩胛」。</p>
       <ul>
         <li v-for="joint in joints" :key="joint.id">
           <button
@@ -41,14 +41,13 @@ const emit = defineEmits<{
       <template v-if="bone">
         <p class="name">{{ bone.zh }}</p>
         <p class="latin">{{ bone.latin }}</p>
-        <p v-if="bone.jointZh" class="meta">所属关节：{{ bone.jointZh }}</p>
         <div class="actions">
           <button type="button" @click="emit('hide')">隐藏</button>
           <button type="button" @click="emit('isolate')">只看这块</button>
           <button type="button" @click="emit('showAll')">显示全部</button>
         </div>
       </template>
-      <p v-else class="hint">点击模型上的骨头查看名称。</p>
+      <p v-else class="hint">点击模型上的关节查看名称。</p>
     </section>
 
     <p class="status">{{ status }}</p>

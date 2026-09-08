@@ -22,6 +22,7 @@ const background = ref<BackgroundId>('dark')
 const gizmoMode = ref<'rotate' | 'translate'>('rotate')
 const aboutOpen = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const photoInput = ref<HTMLInputElement | null>(null)
 
 const canTranslate = ref(false)
 
@@ -34,7 +35,7 @@ onMounted(() => {
     },
     onReady: () => {
       joints.value = instance.jointList
-      status.value = '拖动旋转视角；点选骨头后拖动坐标轴摆姿势'
+      status.value = '拖动旋转视角；点选整组关节后拖动坐标轴摆姿势'
     },
     onError: (message) => {
       status.value = `加载失败：${message}`
@@ -108,6 +109,25 @@ async function onFile(event: Event) {
     status.value = '姿势文件无法解析'
   }
 }
+
+function onPhoto() {
+  photoInput.value?.click()
+}
+
+async function onPhotoFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || !viewer.value) return
+  status.value = '正在从照片估计姿势…'
+  try {
+    await viewer.value.poseFromPhoto(file)
+    status.value = '已按照片摆姿势，可用坐标轴再微调'
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    status.value = message
+  }
+}
 </script>
 
 <template>
@@ -121,9 +141,12 @@ async function onFile(event: Event) {
       @camera="onCamera"
       @background="onBackground"
       @gizmo="onGizmo"
+      @zoom-in="viewer?.zoomIn()"
+      @zoom-out="viewer?.zoomOut()"
       @reset="onReset"
       @save="onSave"
       @load="onLoad"
+      @photo="onPhoto"
     />
 
     <div class="main">
@@ -155,6 +178,13 @@ async function onFile(event: Event) {
       type="file"
       accept="application/json,.json"
       @change="onFile"
+    />
+    <input
+      ref="photoInput"
+      class="file"
+      type="file"
+      accept="image/*"
+      @change="onPhotoFile"
     />
 
     <div v-if="aboutOpen" class="modal" @click.self="aboutOpen = false">

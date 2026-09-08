@@ -1,4 +1,15 @@
-import { Box3, Group, Object3D, Quaternion, Vector3 } from 'three'
+import {
+  Box3,
+  BufferGeometry,
+  Group,
+  Matrix4,
+  Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  Quaternion,
+  Vector3,
+} from 'three'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { JOINT_DEFS, type JointDef, type PivotMode, type Side } from '../data/joints'
 import type { BoneMesh } from './loadSkeleton'
 
@@ -30,9 +41,18 @@ export interface SkeletonRig {
   translateLimit: number
 }
 
+const SCAPULA_FOLLOW = 0.33
+const CLAVICLE_FOLLOW = 0.2
+const HUMERUS_KEEP = 0.67
+
 const _box = new Box3()
 const _size = new Vector3()
 const _center = new Vector3()
+const _identity = new Quaternion()
+const _qRel = new Quaternion()
+const _qDrive = new Quaternion()
+const _invJoint = new Matrix4()
+const _bake = new Matrix4()
 
 function meshSide(mesh: Object3D, midline: number, gap: number): Side {
   _box.setFromObject(mesh)
@@ -53,6 +73,8 @@ function computePivot(meshes: Object3D[], mode: PivotMode, side: Side): Vector3 
     pivot.y = _box.max.y
   } else if (mode === 'inferior') {
     pivot.y = _box.min.y
+  } else if (mode === 'base') {
+    pivot.y = _box.min.y + _size.y * 0.12
   } else if (mode === 'medial') {
     pivot.x = Math.abs(_box.min.x) < Math.abs(_box.max.x) ? _box.min.x : _box.max.x
     if (side === 'L') pivot.x = _box.min.x
@@ -64,7 +86,60 @@ function computePivot(meshes: Object3D[], mode: PivotMode, side: Side): Vector3 
   return pivot
 }
 
-export function buildSkeletonRig(bones: BoneMesh[]): SkeletonRig {
+function bakeGeometriesToJoint(joint: RigJoint): BufferGeometry[] {
+  joint.node.updateWorldMatrix(true, true)
+  _invJoint.copy(joint.node.matrixWorld).invert()
+  const geos: BufferGeometry[] = []
+  for (const bone of joint.bones) {
+    bone.updateWorldMatrix(true, false)
+    let geo = bone.geometry.clone()
+    if (geo.index) {
+      const unindexed = geo.toNonIndexed()
+      geo.dispose()
+      geo = unindexed
+    }
+    _bake.copy(bone.matrixWorld).premultiply(_invJoint)
+    const pos = geo.getAttribute('position')
+    const baked = new BufferGeometry()
+    baked.setAttribute('position', pos.clone())
+    baked.applyMatrix4(_bake)
+    baked.computeVertexNormals()
+    geo.dispose()
+    geos.push(baked)
+  }
+  return geos
+}
+
+function mergeJointMeshes(joint: RigJoint, material: MeshStandardMaterial): BoneMesh[] {
+  if (joint.bones.length === 0) return []
+
+  const sources = joint.bones
+  const geos = bakeGeometriesToJoint(joint)
+  let merged: BufferGeometry | null = geos.length === 1 ? geos[0] : mergeGeometries(geos, false)
+  if (!merged) {
+    merged = geos[0]
+    for (let i = 1; i < geos.length; i++) geos[i].dispose()
+  } else if (geos.length > 1) {
+    for (const geo of geos) geo.dispose()
+  }
+
+  merged.computeVertexNormals()
+  const mesh = new Mesh(merged, material) as BoneMesh
+  mesh.name = joint.def.id
+  mesh.userData.jointId = joint.def.id
+  mesh.castShadow = false
+  mesh.receiveShadow = false
+
+  for (const bone of sources) {
+    bone.removeFromParent()
+  }
+
+  joint.node.add(mesh)
+  joint.bones = [mesh]
+  return [mesh]
+}
+
+export function buildSkeletonRig(bones: BoneMesh[], material: MeshStandardMaterial): SkeletonRig {
   const root = new Group()
   root.name = 'SkeletonRig'
 
@@ -117,8 +192,6 @@ export function buildSkeletonRig(bones: BoneMesh[]): SkeletonRig {
       bone.userData.jointId = joint.def.id
       joint.node.attach(bone)
     }
-    joint.restQuaternion.copy(joint.node.quaternion)
-    joint.restPosition.copy(joint.node.position)
   }
 
   const leftovers = bones.filter((b) => !claimed.has(b))
@@ -138,10 +211,17 @@ export function buildSkeletonRig(bones: BoneMesh[]): SkeletonRig {
   root.position.sub(worldCenter)
   root.updateMatrixWorld(true)
 
+  const mergedBones: BoneMesh[] = []
+  for (const joint of joints.values()) {
+    mergedBones.push(...mergeJointMeshes(joint, material))
+    joint.restQuaternion.copy(joint.node.quaternion)
+    joint.restPosition.copy(joint.node.position)
+  }
+
   return {
     root,
     joints,
-    bones,
+    bones: mergedBones,
     height,
     translateLimit: height * 0.045,
   }
@@ -185,4 +265,55 @@ export function clampJointTranslation(joint: RigJoint, limit: number): void {
   p.x = rest.x + Math.min(limit, Math.max(-limit, p.x - rest.x))
   p.y = rest.y + Math.min(limit, Math.max(-limit, p.y - rest.y))
   p.z = rest.z + Math.min(limit * 1.2, Math.max(-limit * 1.2, p.z - rest.z))
+}
+
+function humerusRelative(humerus: RigJoint): Quaternion {
+  return _qRel.copy(humerus.restQuaternion).invert().multiply(humerus.node.quaternion)
+}
+
+function driveFromHumerus(target: RigJoint, qRel: Quaternion, weight: number): void {
+  _qDrive.slerpQuaternions(_identity, qRel, weight)
+  target.node.quaternion.copy(target.restQuaternion).multiply(_qDrive)
+}
+
+export function driveShoulderGirdle(rig: SkeletonRig, side: Side): void {
+  if (side === 'C') return
+  const humerus = rig.joints.get(`humerus_${side}`)
+  const scapula = rig.joints.get(`scapula_${side}`)
+  const clavicle = rig.joints.get(`clavicle_${side}`)
+  if (!humerus || !scapula || !clavicle) return
+
+  const qRel = humerusRelative(humerus)
+  driveFromHumerus(scapula, qRel, SCAPULA_FOLLOW)
+  driveFromHumerus(clavicle, qRel, CLAVICLE_FOLLOW)
+  rig.root.updateMatrixWorld(true)
+}
+
+export function splitShoulderGirdle(rig: SkeletonRig, side: Side): void {
+  if (side === 'C') return
+  const humerus = rig.joints.get(`humerus_${side}`)
+  const scapula = rig.joints.get(`scapula_${side}`)
+  const clavicle = rig.joints.get(`clavicle_${side}`)
+  if (!humerus || !scapula || !clavicle) return
+
+  const qRel = humerusRelative(humerus).clone()
+  driveFromHumerus(scapula, qRel, SCAPULA_FOLLOW)
+  driveFromHumerus(clavicle, qRel, CLAVICLE_FOLLOW)
+  _qDrive.slerpQuaternions(_identity, qRel, HUMERUS_KEEP)
+  humerus.node.quaternion.copy(humerus.restQuaternion).multiply(_qDrive)
+  rig.root.updateMatrixWorld(true)
+}
+
+export function captureJointWorld(rig: SkeletonRig): {
+  position: Map<string, Vector3>
+  quaternion: Map<string, Quaternion>
+} {
+  rig.root.updateMatrixWorld(true)
+  const position = new Map<string, Vector3>()
+  const quaternion = new Map<string, Quaternion>()
+  for (const [id, joint] of rig.joints) {
+    position.set(id, joint.node.getWorldPosition(new Vector3()))
+    quaternion.set(id, joint.node.getWorldQuaternion(new Quaternion()))
+  }
+  return { position, quaternion }
 }

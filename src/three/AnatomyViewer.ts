@@ -4,11 +4,11 @@ import {
   type Material,
   type MeshStandardMaterial,
 } from 'three'
-import { chineseBoneName, latinBoneName } from '../data/boneNames'
 import { findJointDef } from '../data/joints'
 import {
   applyViewPreset,
   createScene,
+  dollyCamera,
   frameTarget,
   resizeScene,
   setBackground,
@@ -24,11 +24,13 @@ import {
   loadBodyGltf,
   type BoneMesh,
 } from './loadSkeleton'
+import { poseSkeletonFromPhoto } from './poseFromPhoto'
 import {
   applyPose,
   buildSkeletonRig,
   capturePose,
   clampJointTranslation,
+  driveShoulderGirdle,
   resetRigPose,
   type PoseMap,
   type RigJoint,
@@ -77,9 +79,15 @@ export class AnatomyViewer {
     this.bundle = createScene(container)
     this.bundle.transform.addEventListener('dragging-changed', (event) => {
       this.dragging = Boolean(event.value)
-      if (!event.value) this.clampActiveJoint()
+      if (!event.value) {
+        this.clampActiveJoint()
+        this.driveShoulderIfNeeded()
+      }
     })
-    this.bundle.transform.addEventListener('objectChange', () => this.clampActiveJoint())
+    this.bundle.transform.addEventListener('objectChange', () => {
+      this.clampActiveJoint()
+      this.driveShoulderIfNeeded()
+    })
 
     this.onResize = () => {
       resizeScene(this.bundle, this.container.clientWidth, this.container.clientHeight)
@@ -121,7 +129,7 @@ export class AnatomyViewer {
       if (this.disposed) return
       const bones = collectBoneMeshes(model)
       this.boneMaterial = applyBoneMaterial(bones)
-      this.rig = buildSkeletonRig(bones)
+      this.rig = buildSkeletonRig(bones, this.boneMaterial)
       this.bundle.scene.add(this.rig.root)
       frameTarget(this.bundle, new Vector3(0, 0, 0), this.rig.height)
       applyViewPreset(this.bundle, 'threeQuarter', Math.max(this.rig.height * 1.6, 1.4))
@@ -186,12 +194,13 @@ export class AnatomyViewer {
     this.selectedJointId = jointId
     if (jointId) this.attachGizmo(jointId)
 
+    const def = findJointDef(jointId ?? '')
     this.callbacks.onSelect?.({
       meshName: mesh.name,
-      zh: chineseBoneName(mesh.name),
-      latin: latinBoneName(mesh.name),
+      zh: def?.labelZh ?? mesh.name,
+      latin: def?.labelLa ?? mesh.name,
       jointId: jointId ?? '',
-      jointZh: findJointDef(jointId ?? '')?.labelZh ?? '',
+      jointZh: def?.labelZh ?? '',
     })
     this.callbacks.onJointSelect?.(jointId)
   }
@@ -229,6 +238,14 @@ export class AnatomyViewer {
     applyViewPreset(this.bundle, preset, dist)
   }
 
+  zoomIn(): void {
+    dollyCamera(this.bundle, true)
+  }
+
+  zoomOut(): void {
+    dollyCamera(this.bundle, false)
+  }
+
   resetPose(): void {
     if (!this.rig) return
     resetRigPose(this.rig)
@@ -242,6 +259,11 @@ export class AnatomyViewer {
   importPose(pose: PoseMap): void {
     if (!this.rig) return
     applyPose(this.rig, pose)
+  }
+
+  async poseFromPhoto(file: File): Promise<void> {
+    if (!this.rig) throw new Error('骨骼尚未加载完成')
+    await poseSkeletonFromPhoto(this.rig, file)
   }
 
   hideSelected(): void {
@@ -303,6 +325,13 @@ export class AnatomyViewer {
     const joint = this.activeJoint()
     if (!joint || !this.rig) return
     clampJointTranslation(joint, this.rig.translateLimit)
+  }
+
+  private driveShoulderIfNeeded(): void {
+    if (!this.rig) return
+    const id = this.selectedJointId
+    if (id === 'humerus_L') driveShoulderGirdle(this.rig, 'L')
+    else if (id === 'humerus_R') driveShoulderGirdle(this.rig, 'R')
   }
 
   private clearHighlight(): void {

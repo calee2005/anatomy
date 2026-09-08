@@ -1,6 +1,6 @@
 export type Side = 'L' | 'R' | 'C'
 
-export type PivotMode = 'center' | 'proximal' | 'inferior' | 'medial' | 'glenoid'
+export type PivotMode = 'center' | 'proximal' | 'inferior' | 'medial' | 'glenoid' | 'base'
 
 export interface JointDef {
   id: string
@@ -35,6 +35,23 @@ function isFootName(name: string): boolean {
   )
 }
 
+function isHandName(name: string): boolean {
+  return /carpal|metacarpal|phalanx|finger|scaphoid|lunate|triquetrum|pisiform|trapezium|trapezoid|capitate|hamate/.test(
+    n(name),
+  )
+}
+
+export function isTinyFragmentName(name: string): boolean {
+  const s = n(name)
+  return /malleus|incus|stapes/.test(s)
+}
+
+export function isMandibleName(name: string): boolean {
+  const s = n(name)
+  if (s === 'mandible' || s.startsWith('mandible')) return true
+  return /^(lower|mandibular)\b/.test(s) && /incisor|canine|premolar|molar|tooth/.test(s)
+}
+
 export const JOINT_DEFS: JointDef[] = [
   {
     id: 'pelvis',
@@ -61,7 +78,7 @@ export const JOINT_DEFS: JointDef[] = [
     labelZh: '胸廓',
     labelLa: 'Thorax',
     side: 'C',
-    pivot: 'center',
+    pivot: 'base',
     match: (name) => {
       const s = n(name)
       return (
@@ -172,11 +189,8 @@ export const JOINT_DEFS: JointDef[] = [
     side: 'L',
     pivot: 'proximal',
     match: (name) => {
-      const s = n(name)
       if (isFootName(name)) return false
-      return /carpal|metacarpal|phalanx|finger|scaphoid|lunate|triquetrum|pisiform|trapezium|trapezoid|capitate|hamate/.test(
-        s,
-      )
+      return isHandName(name)
     },
   },
   {
@@ -187,11 +201,8 @@ export const JOINT_DEFS: JointDef[] = [
     side: 'R',
     pivot: 'proximal',
     match: (name) => {
-      const s = n(name)
       if (isFootName(name)) return false
-      return /carpal|metacarpal|phalanx|finger|scaphoid|lunate|triquetrum|pisiform|trapezium|trapezoid|capitate|hamate/.test(
-        s,
-      )
+      return isHandName(name)
     },
   },
   {
@@ -257,14 +268,18 @@ export const JOINT_DEFS: JointDef[] = [
     pivot: 'inferior',
     match: (name) => {
       const s = n(name)
-      if (isFootName(name)) return false
-      if (/carpal|metacarpal|phalanx|finger|scaphoid|lunate|triquetrum|pisiform|trapezium|trapezoid|capitate|hamate/.test(s)) {
-        return false
-      }
-      return /bone|mandible|maxilla|vomer|concha|incisor|canine|premolar|molar|tooth|malleus|incus|stapes|nasal/.test(
-        s,
-      )
+      if (isFootName(name) || isHandName(name) || isMandibleName(name)) return false
+      return /bone|maxilla|vomer|concha|incisor|canine|premolar|molar|tooth|nasal/.test(s)
     },
+  },
+  {
+    id: 'mandible',
+    parent: 'skull',
+    labelZh: '下颌',
+    labelLa: 'Mandibula',
+    side: 'C',
+    pivot: 'proximal',
+    match: (name) => isMandibleName(name),
   },
 ]
 
