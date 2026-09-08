@@ -35,3 +35,9 @@ npm run dev
 详见 [NOTICE](NOTICE)。
 
 若缺少 `public/models/body.glb`，从上述 hpfrei 仓库的 `public/body.glb` 下载到该路径。
+
+## GitHub Pages
+
+在线地址：[https://calee2005.github.io/anatomy/](https://calee2005.github.io/anatomy/)
+
+推送到 `master` 后由 GitHub Actions 构建 `dist` 并发布。仓库 **Settings → Pages** 的 Source 需选 **GitHub Actions**（不要选 `master` 根目录，否则会去请求 `/src/main.ts` 并 404）。
