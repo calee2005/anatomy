@@ -19,6 +19,7 @@ const emit = defineEmits<{
 
 <template>
   <aside class="panel">
+    <slot />
     <section>
       <h2>关节</h2>
       <p class="hint">点选整组关节或从列表选择，拖动 gizmo 摆姿势。抬臂时肩胛会跟着动；肩胛可切换「平移肩胛」。</p>

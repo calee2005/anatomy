@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import PracticePanel from './components/PracticePanel.vue'
 import SidePanel from './components/SidePanel.vue'
 import Toolbar from './components/Toolbar.vue'
 import type { BackgroundId, CameraKind, ViewPreset } from './three/createScene'
@@ -8,6 +9,7 @@ import {
   downloadJson,
   readJsonFile,
   type BoneInfo,
+  type PracticeState,
 } from './three/AnatomyViewer'
 
 const viewport = ref<HTMLElement | null>(null)
@@ -25,6 +27,16 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const photoInput = ref<HTMLInputElement | null>(null)
 
 const canTranslate = ref(false)
+const practice = ref<PracticeState>({
+  active: false,
+  girdleOnly: false,
+  grid: { n: 8, m: 8, k: 4 },
+  cell: { i: 0, j: 0, l: 0 },
+  euler: { yaw: 0, pitch: 0, roll: 0 },
+  linear: 0,
+  total: 256,
+  token: '1,1,1',
+})
 
 onMounted(() => {
   if (!viewport.value) return
@@ -51,6 +63,9 @@ onMounted(() => {
         gizmoMode.value = 'rotate'
         instance.setGizmoMode('rotate')
       }
+    },
+    onPractice: (state) => {
+      practice.value = state
     },
   })
   viewer.value = instance
@@ -110,6 +125,14 @@ async function onFile(event: Event) {
   }
 }
 
+function onPracticeToggle() {
+  const next = !practice.value.active
+  viewer.value?.setPracticeMode(next)
+  status.value = next
+    ? '胸锁练习：拖动红/绿/蓝环转到角度；点刻度或输入 n,m,k 分段'
+    : '拖动旋转视角；点选整组关节后拖动坐标轴摆姿势'
+}
+
 function onPhoto() {
   photoInput.value?.click()
 }
@@ -137,6 +160,7 @@ async function onPhotoFile(event: Event) {
       :background="background"
       :gizmo-mode="gizmoMode"
       :can-translate="canTranslate"
+      :practice="practice.active"
       @view="onView"
       @camera="onCamera"
       @background="onBackground"
@@ -147,6 +171,7 @@ async function onPhotoFile(event: Event) {
       @save="onSave"
       @load="onLoad"
       @photo="onPhoto"
+      @practice="onPracticeToggle"
     />
 
     <div class="main">
@@ -169,7 +194,17 @@ async function onPhotoFile(event: Event) {
         @isolate="viewer?.isolateSelected()"
         @show-all="viewer?.showAll()"
         @about="aboutOpen = $event"
-      />
+      >
+        <PracticePanel
+          v-if="practice.active"
+          :practice="practice"
+          @girdle-only="(on) => viewer?.setGirdleOnly(on)"
+          @divisions="(n, m, k) => viewer?.setDivisions(n, m, k)"
+          @go="(i, j, l) => viewer?.goToCell({ i, j, l })"
+          @snap="viewer?.snapToGrid()"
+          @step="(delta) => viewer?.stepPractice(delta)"
+        />
+      </SidePanel>
     </div>
 
     <input

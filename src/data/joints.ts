@@ -84,10 +84,18 @@ export const JOINT_DEFS: JointDef[] = [
       return (
         /vertebra t\d/.test(s) ||
         /rib/.test(s) ||
-        /sternum|manubrium|xiphoid/.test(s) ||
         /costal cartilage/.test(s)
       )
     },
+  },
+  {
+    id: 'sternum',
+    parent: 'thorax',
+    labelZh: '胸骨',
+    labelLa: 'Sternum',
+    side: 'C',
+    pivot: 'center',
+    match: (name) => /sternum|manubrium|xiphoid/.test(n(name)),
   },
   {
     id: 'cervical',

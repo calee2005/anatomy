@@ -6,6 +6,7 @@ defineProps<{
   background: BackgroundId
   gizmoMode: 'rotate' | 'translate'
   canTranslate: boolean
+  practice: boolean
 }>()
 
 const emit = defineEmits<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   save: []
   load: []
   photo: []
+  practice: []
 }>()
 </script>
 
@@ -36,6 +38,12 @@ const emit = defineEmits<{
       <button type="button" @click="emit('view', 'back')">后</button>
       <button type="button" @click="emit('view', 'top')">顶</button>
       <button type="button" @click="emit('view', 'threeQuarter')">3/4</button>
+    </div>
+
+    <div class="group">
+      <button type="button" :class="{ on: practice }" @click="emit('practice')">
+        胸锁练习
+      </button>
     </div>
 
     <div class="group">

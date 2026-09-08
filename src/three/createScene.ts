@@ -2,6 +2,7 @@ import {
   AmbientLight,
   Color,
   DirectionalLight,
+  Euler,
   HemisphereLight,
   OrthographicCamera,
   PerspectiveCamera,
@@ -12,6 +13,7 @@ import {
   WebGLRenderer,
   type Camera,
 } from 'three'
+import type { OrbitEuler } from './viewGrid'
 import { TrackballControls } from 'three/addons/controls/TrackballControls.js'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
 
@@ -216,7 +218,7 @@ type TrackballInternals = TrackballControls & {
   _zoomEnd: Vector2
 }
 
-function settleTrackball(orbit: TrackballControls): void {
+export function settleTrackball(orbit: TrackballControls): void {
   const ball = orbit as TrackballInternals
   ball._lastAngle = 0
   ball._movePrev.copy(ball._moveCurr)
@@ -244,6 +246,27 @@ export function dollyCamera(bundle: SceneBundle, zoomIn: boolean): void {
   eye.setLength(clamped)
   bundle.camera.position.copy(orbit.target).add(eye)
   orbit.update()
+}
+
+const _euler = new Euler()
+const _offset = new Vector3()
+const _up = new Vector3()
+
+export function applyOrbitEuler(
+  bundle: SceneBundle,
+  euler: OrbitEuler,
+  distance?: number,
+): void {
+  const target = bundle.orbit.target
+  const dist = distance ?? bundle.camera.position.distanceTo(target)
+  _euler.set(euler.pitch, euler.yaw, euler.roll, 'YXZ')
+  _offset.set(0, 0, dist).applyEuler(_euler)
+  _up.set(0, 1, 0).applyEuler(_euler)
+  bundle.camera.up.copy(_up)
+  bundle.camera.position.copy(target).add(_offset)
+  bundle.camera.lookAt(target)
+  settleTrackball(bundle.orbit)
+  bundle.orbit.update()
 }
 
 export function frameTarget(bundle: SceneBundle, center: Vector3, height: number): void {
