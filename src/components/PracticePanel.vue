@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   girdleOnly: [on: boolean]
+  gimbalVisible: [on: boolean]
   divisions: [n: number, m: number, k: number]
   go: [i: number, j: number, l: number]
   snap: []
@@ -83,7 +84,15 @@ function onCell(i: number, j: number) {
         :checked="practice.girdleOnly"
         @click.prevent="emit('girdleOnly', !practice.girdleOnly)"
       />
-      只看胸骨、锁骨、肩胛骨
+      只看胸腔、脊椎、锁骨、肩胛骨
+    </label>
+    <label class="check">
+      <input
+        type="checkbox"
+        :checked="practice.gimbalVisible"
+        @click.prevent="emit('gimbalVisible', !practice.gimbalVisible)"
+      />
+      显示正交导轨
     </label>
 
     <div class="row labels">

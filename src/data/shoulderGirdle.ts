@@ -1,5 +1,8 @@
 export const SHOULDER_GIRDLE_JOINTS = [
+  'lumbar',
+  'thorax',
   'sternum',
+  'cervical',
   'clavicle_L',
   'clavicle_R',
   'scapula_L',

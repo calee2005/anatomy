@@ -64,6 +64,7 @@ export interface BoneInfo {
 export interface PracticeState {
   active: boolean
   girdleOnly: boolean
+  gimbalVisible: boolean
   grid: ViewGrid
   cell: ViewCell
   euler: OrbitEuler
@@ -109,6 +110,7 @@ export class AnatomyViewer {
   private readonly gimbal = new OrthoGimbal()
   private practice = false
   private girdleOnly = false
+  private gimbalVisible = true
   private grid: ViewGrid = { n: 8, m: 8, k: 4 }
   private euler: OrbitEuler = { yaw: 0, pitch: 0, roll: 0 }
   private gimbalHeld = false
@@ -173,6 +175,7 @@ export class AnatomyViewer {
     return {
       active: this.practice,
       girdleOnly: this.girdleOnly,
+      gimbalVisible: this.gimbalVisible,
       grid: { ...this.grid },
       cell,
       euler: { ...this.euler },
@@ -235,7 +238,7 @@ export class AnatomyViewer {
       if (delta) this.applyAxisDelta(delta.axis, delta.delta)
       return
     }
-    if (!this.practice || this.dragging) return
+    if (!this.practice || this.dragging || !this.gimbal.group.visible) return
     const hit = this.gimbal.hitTest(event, this.bundle.renderer.domElement, this.bundle.camera)
     this.gimbal.setHovered(hit?.axis ?? null)
     this.bundle.renderer.domElement.style.cursor = hit ? 'grab' : ''
@@ -405,8 +408,7 @@ export class AnatomyViewer {
 
   setPracticeMode(on: boolean): void {
     this.practice = on
-    this.gimbal.group.visible = on
-    this.bundle.orbit.noRotate = on
+    this.applyGimbalVisibility()
     if (on) {
       this.girdleOnly = true
       this.isolated = false
@@ -425,6 +427,12 @@ export class AnatomyViewer {
         applyViewPreset(this.bundle, 'threeQuarter', Math.max(this.rig.height * 1.6, 1.4))
       }
     }
+    this.emitPractice()
+  }
+
+  setGimbalVisible(on: boolean): void {
+    this.gimbalVisible = on
+    this.applyGimbalVisibility()
     this.emitPractice()
   }
 
@@ -528,8 +536,8 @@ export class AnatomyViewer {
     this.bundle.orbit.minDistance = this.girdleRadius * 0.3
     this.bundle.orbit.maxDistance = this.girdleRadius * 20
     this.gimbal.setCenter(_center)
-    this.gimbal.setRadius(this.girdleRadius * 1.42)
-    const dist = Math.max(this.girdleRadius * 3.5, 0.28)
+    this.gimbal.setRadius(this.girdleRadius * 1.22)
+    const dist = Math.max(this.girdleRadius * 2.55, 0.4)
     if (resetView) applyOrbitEuler(this.bundle, this.euler, dist)
     else {
       applyOrbitEuler(this.bundle, this.euler)
@@ -550,6 +558,16 @@ export class AnatomyViewer {
         continue
       }
       bone.visible = true
+    }
+  }
+
+  private applyGimbalVisibility(): void {
+    const show = this.practice && this.gimbalVisible
+    this.gimbal.group.visible = show
+    this.bundle.orbit.noRotate = show
+    if (!show) {
+      this.bundle.renderer.domElement.style.cursor = ''
+      this.gimbal.setHovered(null)
     }
   }
 

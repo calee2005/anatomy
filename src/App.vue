@@ -30,6 +30,7 @@ const canTranslate = ref(false)
 const practice = ref<PracticeState>({
   active: false,
   girdleOnly: false,
+  gimbalVisible: true,
   grid: { n: 8, m: 8, k: 4 },
   cell: { i: 0, j: 0, l: 0 },
   euler: { yaw: 0, pitch: 0, roll: 0 },
@@ -199,6 +200,7 @@ async function onPhotoFile(event: Event) {
           v-if="practice.active"
           :practice="practice"
           @girdle-only="(on) => viewer?.setGirdleOnly(on)"
+          @gimbal-visible="(on) => viewer?.setGimbalVisible(on)"
           @divisions="(n, m, k) => viewer?.setDivisions(n, m, k)"
           @go="(i, j, l) => viewer?.goToCell({ i, j, l })"
           @snap="viewer?.snapToGrid()"
