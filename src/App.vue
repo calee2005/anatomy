@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { onBeforeUnmount, onMounted, nextTick, ref, shallowRef } from 'vue'
 import PracticePanel from './components/PracticePanel.vue'
 import SidePanel from './components/SidePanel.vue'
 import Toolbar from './components/Toolbar.vue'
 import type { BackgroundId, CameraKind, ViewPreset } from './three/createScene'
+import { BODY_SEX_LABEL, type BodySex } from './data/bodySex'
 import {
   AnatomyViewer,
   downloadJson,
@@ -22,6 +23,7 @@ const bone = ref<BoneInfo | null>(null)
 const cameraKind = ref<CameraKind>('perspective')
 const background = ref<BackgroundId>('dark')
 const gizmoMode = ref<'rotate' | 'translate'>('rotate')
+const bodySex = ref<BodySex>('male')
 const aboutOpen = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const photoInput = ref<HTMLInputElement | null>(null)
@@ -39,6 +41,15 @@ const practice = ref<PracticeState>({
   token: '1,1,1',
 })
 
+function idleStatus() {
+  const sex = BODY_SEX_LABEL[bodySex.value]
+  const props = viewer.value?.bodyProportions
+  const ratio = props ? `，髋/肩 ${props.ratio.toFixed(2)}` : ''
+  return bodySex.value === 'female'
+    ? `${sex}骨骼：骨盆更宽、肩更窄${ratio}`
+    : `${sex}骨骼${ratio}；拖动旋转视角，点选关节后拖动坐标轴摆姿势`
+}
+
 onMounted(() => {
   if (!viewport.value) return
   const instance = new AnatomyViewer(viewport.value, {
@@ -48,7 +59,7 @@ onMounted(() => {
     },
     onReady: () => {
       joints.value = instance.jointList
-      status.value = '拖动旋转视角；点选整组关节后拖动坐标轴摆姿势'
+      status.value = idleStatus()
     },
     onError: (message) => {
       status.value = `加载失败：${message}`
@@ -131,7 +142,18 @@ function onPracticeToggle() {
   viewer.value?.setPracticeMode(next)
   status.value = next
     ? '胸锁练习：拖动红/绿/蓝环转到角度；点刻度或输入 n,m,k 分段'
-    : '拖动旋转视角；点选整组关节后拖动坐标轴摆姿势'
+    : idleStatus()
+}
+
+async function onSexChange(sex: BodySex) {
+  if (!viewer.value || bodySex.value === sex) return
+  bodySex.value = sex
+  status.value = `正在切换为${BODY_SEX_LABEL[sex]}骨骼…`
+  await nextTick()
+  await viewer.value.setSex(sex)
+  if (practice.value.active) {
+    status.value = '胸锁练习：拖动红/绿/蓝环转到角度；点刻度或输入 n,m,k 分段'
+  }
 }
 
 function onPhoto() {
@@ -162,6 +184,7 @@ async function onPhotoFile(event: Event) {
       :gizmo-mode="gizmoMode"
       :can-translate="canTranslate"
       :practice="practice.active"
+      :sex="bodySex"
       @view="onView"
       @camera="onCamera"
       @background="onBackground"
@@ -173,13 +196,14 @@ async function onPhotoFile(event: Event) {
       @load="onLoad"
       @photo="onPhoto"
       @practice="onPracticeToggle"
+      @sex-change="onSexChange"
     />
 
     <div class="main">
       <div class="stage">
         <div ref="viewport" class="viewport" />
         <div
-          v-if="status.startsWith('正在加载') || status.startsWith('加载模型')"
+          v-if="status.startsWith('正在加载') || status.startsWith('加载模型') || status.startsWith('正在切换')"
           class="loading"
         >
           {{ status }}
@@ -228,14 +252,14 @@ async function onPhotoFile(event: Event) {
     <div v-if="aboutOpen" class="modal" @click.self="aboutOpen = false">
       <div class="sheet">
         <h2>关于与许可</h2>
-        <p>这是一个本地运行的艺用人体骨骼 3D 参考工具：观察、点选、摆大关节姿势。肌肉层尚未开放。</p>
+        <p>这是一个本地运行的艺用人体骨骼 3D 参考工具：观察、点选、摆大关节姿势。肌肉层尚未开放。顶栏可在男性和女性骨骼之间切换。</p>
         <p>
           三维模型来自
           <a href="https://www.z-anatomy.com/" target="_blank" rel="noreferrer">Z-Anatomy</a>
           （CC BY-SA 4.0），其数据源自
           BodyParts3D © The Database Center for Life Science（CC BY 4.0）。浏览器优化版由
           <a href="https://github.com/hpfrei/body-anatomy-3d-viewer" target="_blank" rel="noreferrer">hpfrei/body-anatomy-3d-viewer</a>
-          处理。
+          处理。女性骨骼在同一男性模板上按两性骨骼比例（更宽骨盆、更窄肩带、膝外翻等）变形，供艺用对照，并非另一套扫描标本。
         </p>
         <p>本仓库中的程序代码以 MIT 许可发布；网格资产仍遵循上述原许可，详见 NOTICE。</p>
         <button type="button" @click="aboutOpen = false">关闭</button>

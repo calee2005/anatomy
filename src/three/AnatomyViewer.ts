@@ -1,5 +1,6 @@
-import { Box3, Color, Sphere, Vector3, type Material, type MeshStandardMaterial } from 'three'
+import { Box3, Color, Sphere, Vector3, type Material, type MeshStandardMaterial, type Object3D } from 'three'
 import { isShoulderGirdleJoint, SHOULDER_GIRDLE_JOINTS } from '../data/shoulderGirdle'
+import type { BodySex } from '../data/bodySex'
 import { findJointDef } from '../data/joints'
 import {
   applyOrbitEuler,
@@ -18,10 +19,14 @@ import {
 } from './createScene'
 import {
   applyBoneMaterial,
+  cloneBoneGraph,
   collectBoneMeshes,
+  disposeObjectGeometries,
   loadBodyGltf,
+  pruneNonBoneMeshes,
   type BoneMesh,
 } from './loadSkeleton'
+import { applyBodySexMorph } from './sexMorph'
 import { cloneShadedBoneMaterial, updateBoneShade } from './boneShade'
 import {
   eulerFromOffset,
@@ -35,8 +40,10 @@ import {
   buildSkeletonRig,
   capturePose,
   clampJointTranslation,
+  disposeSkeletonRig,
   driveShoulderGirdle,
   resetRigPose,
+  transferPose,
   type PoseMap,
   type RigJoint,
   type SkeletonRig,
@@ -54,6 +61,8 @@ import {
   type ViewCell,
   type ViewGrid,
 } from './viewGrid'
+
+export type { BodySex } from '../data/bodySex'
 
 export interface BoneInfo {
   meshName: string
@@ -120,6 +129,10 @@ export class AnatomyViewer {
   private pendingHit: { axis: GimbalAxis; tick: number | null } | null = null
   private girdleRadius = 0.2
   private canvasDown = false
+  private sourceModel: Object3D | null = null
+  private sex: BodySex = 'male'
+  private readonly rigCache = new Map<BodySex, { rig: SkeletonRig; material: MeshStandardMaterial }>()
+  private framed = false
 
   constructor(container: HTMLElement, callbacks: ViewerCallbacks = {}) {
     this.container = container
@@ -187,6 +200,28 @@ export class AnatomyViewer {
     }
   }
 
+  get bodyProportions(): { hip: number; shoulder: number; ratio: number } | null {
+    if (!this.rig) return null
+    _box.makeEmpty()
+    const pelvis = this.rig.joints.get('pelvis')
+    if (pelvis) {
+      for (const bone of pelvis.bones) _box.expandByObject(bone)
+    }
+    const hip = _box.isEmpty() ? 0 : _box.max.x - _box.min.x
+    _box.makeEmpty()
+    for (const id of ['clavicle_L', 'clavicle_R', 'scapula_L', 'scapula_R'] as const) {
+      const joint = this.rig.joints.get(id)
+      if (!joint) continue
+      for (const bone of joint.bones) _box.expandByObject(bone)
+    }
+    const shoulder = _box.isEmpty() ? 0 : _box.max.x - _box.min.x
+    return {
+      hip,
+      shoulder,
+      ratio: shoulder > 1e-6 ? hip / shoulder : 0,
+    }
+  }
+
   private async load(): Promise<void> {
     try {
       const model = await loadBodyGltf(
@@ -194,18 +229,70 @@ export class AnatomyViewer {
         this.callbacks.onProgress,
       )
       if (this.disposed) return
-      const bones = collectBoneMeshes(model)
-      this.boneMaterial = applyBoneMaterial(bones)
-      this.rig = buildSkeletonRig(bones, this.boneMaterial)
-      this.bundle.scene.add(this.rig.root)
-      frameTarget(this.bundle, new Vector3(0, 0, 0), this.rig.height)
-      applyViewPreset(this.bundle, 'threeQuarter', Math.max(this.rig.height * 1.6, 1.4))
-      this.callbacks.onReady?.()
-      this.emitPractice()
+      pruneNonBoneMeshes(model)
+      this.sourceModel = model
+      this.mountRig(this.sex, true)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.callbacks.onError?.(message)
     }
+  }
+
+  async setSex(sex: BodySex): Promise<void> {
+    if (this.disposed || (this.sex === sex && this.rig)) return
+    this.sex = sex
+    if (!this.sourceModel) return
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    if (this.disposed || this.sex !== sex) return
+    this.mountRig(sex, false)
+  }
+
+  private mountRig(sex: BodySex, initial: boolean): void {
+    const previous = this.rig
+    const selectedId = this.selectedJointId
+    const isolated = this.isolated
+    this.selectMesh(null)
+
+    if (this.rig) {
+      this.rig.root.removeFromParent()
+    }
+
+    const cached = this.rigCache.get(sex)
+    if (cached) {
+      this.rig = cached.rig
+      this.boneMaterial = cached.material
+    } else if (this.sourceModel) {
+      const model = cloneBoneGraph(this.sourceModel)
+      applyBodySexMorph(model, sex)
+      const bones = collectBoneMeshes(model)
+      const material = applyBoneMaterial(bones)
+      const rig = buildSkeletonRig(bones, material)
+      this.rigCache.set(sex, { rig, material })
+      this.rig = rig
+      this.boneMaterial = material
+    } else {
+      return
+    }
+
+    this.bundle.scene.add(this.rig.root)
+    if (previous && previous !== this.rig) transferPose(previous, this.rig)
+    this.isolated = isolated
+    this.applyVisibility()
+    if (this.practice) this.framePractice(false)
+
+    if (initial || !this.framed) {
+      frameTarget(this.bundle, new Vector3(0, 0, 0), this.rig.height)
+      applyViewPreset(this.bundle, 'threeQuarter', Math.max(this.rig.height * 1.6, 1.4))
+      this.framed = true
+    }
+
+    if (selectedId) {
+      this.selectJoint(selectedId)
+      if (isolated) this.isolateSelected()
+    }
+
+    this.callbacks.onReady?.()
+    this.emitPractice()
   }
 
   private loop = (): void => {
@@ -490,6 +577,17 @@ export class AnatomyViewer {
     window.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('pointerup', this.onPointerUp)
     this.gimbal.dispose()
+    for (const { rig, material } of this.rigCache.values()) {
+      disposeSkeletonRig(rig)
+      material.dispose()
+    }
+    this.rigCache.clear()
+    this.rig = null
+    this.boneMaterial = null
+    if (this.sourceModel) {
+      disposeObjectGeometries(this.sourceModel)
+      this.sourceModel = null
+    }
     this.bundle.transform.dispose()
     this.bundle.orbit.dispose()
     this.bundle.renderer.dispose()

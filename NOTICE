@@ -22,3 +22,7 @@ meshes are not.
 If you redistribute the mesh files or adaptations of them, keep the
 attribution above. Derivatives of the Z-Anatomy / hpfrei mesh must remain
 CC BY-SA 4.0.
+
+The female skeleton view is a geometric adaptation of the same male
+Z-Anatomy whole-body template (there is no second scanned specimen in that
+dataset). That adaptation is also a CC BY-SA 4.0 derivative.

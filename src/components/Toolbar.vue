@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BackgroundId, CameraKind, ViewPreset } from '../three/createScene'
+import type { BodySex } from '../data/bodySex'
 
 defineProps<{
   cameraKind: CameraKind
@@ -7,6 +8,7 @@ defineProps<{
   gizmoMode: 'rotate' | 'translate'
   canTranslate: boolean
   practice: boolean
+  sex: BodySex
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +23,7 @@ const emit = defineEmits<{
   load: []
   photo: []
   practice: []
+  sexChange: [sex: BodySex]
 }>()
 </script>
 
@@ -29,6 +32,27 @@ const emit = defineEmits<{
     <div class="brand">
       <strong>艺用骨骼</strong>
       <span>3D 参考</span>
+    </div>
+
+    <div class="group">
+      <button
+        type="button"
+        :class="{ on: sex === 'male' }"
+        title="男性骨骼"
+        :aria-pressed="sex === 'male'"
+        @click="emit('sexChange', 'male')"
+      >
+        男
+      </button>
+      <button
+        type="button"
+        :class="{ on: sex === 'female' }"
+        title="女性骨骼"
+        :aria-pressed="sex === 'female'"
+        @click="emit('sexChange', 'female')"
+      >
+        女
+      </button>
     </div>
 
     <div class="group">
