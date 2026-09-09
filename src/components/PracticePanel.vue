@@ -28,6 +28,16 @@ watch(
   },
 )
 
+const girdleOnly = computed({
+  get: () => props.practice.girdleOnly,
+  set: (on: boolean) => emit('girdleOnly', on),
+})
+
+const gimbalVisible = computed({
+  get: () => props.practice.gimbalVisible,
+  set: (on: boolean) => emit('gimbalVisible', on),
+})
+
 const cells = computed(() => {
   const { n, m } = props.practice.grid
   const list: { i: number; j: number; key: string }[] = []
@@ -80,19 +90,11 @@ function onCell(i: number, j: number) {
     </p>
 
     <label class="check">
-      <input
-        type="checkbox"
-        :checked="practice.girdleOnly"
-        @click.prevent="emit('girdleOnly', !practice.girdleOnly)"
-      />
+      <input type="checkbox" v-model="girdleOnly" />
       只看胸腔、脊椎、锁骨、肩胛骨
     </label>
     <label class="check">
-      <input
-        type="checkbox"
-        :checked="practice.gimbalVisible"
-        @click.prevent="emit('gimbalVisible', !practice.gimbalVisible)"
-      />
+      <input type="checkbox" v-model="gimbalVisible" />
       显示正交导轨
     </label>
 
