@@ -132,6 +132,7 @@ function mergeJointMeshes(joint: RigJoint, material: MeshStandardMaterial): Bone
 
   for (const bone of sources) {
     bone.removeFromParent()
+    bone.geometry.dispose()
   }
 
   joint.node.add(mesh)
@@ -225,6 +226,31 @@ export function buildSkeletonRig(bones: BoneMesh[], material: MeshStandardMateri
     height,
     translateLimit: height * 0.045,
   }
+}
+
+export function disposeSkeletonRig(rig: SkeletonRig): void {
+  for (const bone of rig.bones) {
+    bone.geometry.dispose()
+  }
+  rig.root.removeFromParent()
+}
+
+export function transferPose(from: SkeletonRig, to: SkeletonRig): void {
+  for (const [id, src] of from.joints) {
+    const dst = to.joints.get(id)
+    if (!dst) continue
+    _qRel.copy(src.restQuaternion).invert().multiply(src.node.quaternion)
+    dst.node.quaternion.copy(dst.restQuaternion).multiply(_qRel)
+    if (dst.def.allowTranslate) {
+      dst.node.position.set(
+        dst.restPosition.x + src.node.position.x - src.restPosition.x,
+        dst.restPosition.y + src.node.position.y - src.restPosition.y,
+        dst.restPosition.z + src.node.position.z - src.restPosition.z,
+      )
+      clampJointTranslation(dst, to.translateLimit)
+    }
+  }
+  to.root.updateMatrixWorld(true)
 }
 
 export function resetRigPose(rig: SkeletonRig): void {

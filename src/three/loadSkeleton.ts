@@ -46,6 +46,37 @@ export function collectBoneMeshes(root: Object3D): BoneMesh[] {
   return bones
 }
 
+/** Drop muscles and other non-bone meshes so sex clones stay small. */
+export function pruneNonBoneMeshes(root: Object3D): void {
+  const remove: Object3D[] = []
+  root.traverse((child) => {
+    if (!(child as Mesh).isMesh) return
+    if (!isBoneObject(child) || isTinyFragmentName(child.name)) remove.push(child)
+  })
+  for (const obj of remove) {
+    const mesh = obj as Mesh
+    mesh.removeFromParent()
+    mesh.geometry.dispose()
+  }
+}
+
+export function cloneBoneGraph(source: Object3D): Object3D {
+  const cloned = source.clone(true)
+  cloned.traverse((child) => {
+    const mesh = child as Mesh
+    if (!mesh.isMesh) return
+    mesh.geometry = mesh.geometry.clone()
+  })
+  return cloned
+}
+
+export function disposeObjectGeometries(root: Object3D): void {
+  root.traverse((child) => {
+    const mesh = child as Mesh
+    if (mesh.isMesh) mesh.geometry.dispose()
+  })
+}
+
 export function applyBoneMaterial(bones: BoneMesh[]): MeshStandardMaterial {
   const material = createBoneMaterial()
 
