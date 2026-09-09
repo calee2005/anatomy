@@ -140,7 +140,6 @@ export class OrthoGimbal {
   beginDrag(
     event: PointerEvent,
     canvas: HTMLElement,
-    camera: Camera,
     axis: GimbalAxis,
   ): boolean {
     pointerFromEvent(event, canvas, _pointer)
