@@ -181,25 +181,38 @@ function morphFemaleVertex(p: Vector3, ctx: MorphContext): void {
   let sx = lerpKeys(t, WIDTH_KEYS)
 
   if (ctx.family === 'clavicle' || ctx.family === 'scapula') {
-    sx = 0.84
+    sx = 0.8
+  } else if (ctx.family === 'humerus' || ctx.family === 'forearm' || ctx.family === 'hand') {
+    // Keep the hanging arms under the narrower shoulders; do not flare them
+    // with the pelvis just because they occupy the same height.
+    sx = 0.82
   } else if (ctx.family === 'pelvis' || ctx.family === 'sacrum') {
     const ty = clamp01((p.y - ctx.pelvisMinY) / ctx.pelvisH)
     const nx = (p.x - ctx.midX) / Math.max(ctx.height * 0.12, 1e-4)
-    const anteriorness = clamp01(0.5 + ctx.anterior * (p.z - ctx.midZ) / Math.max(ctx.height * 0.08, 1e-4))
-    const iliacFlare = smoothstep(0.45, 1, ty) * (0.35 + 0.65 * Math.min(1, Math.abs(nx)))
+    const anteriorness = clamp01(
+      0.5 + (ctx.anterior * (p.z - ctx.midZ)) / Math.max(ctx.height * 0.08, 1e-4),
+    )
+    const iliacFlare = smoothstep(0.4, 1, ty) * (0.3 + 0.7 * Math.min(1, Math.abs(nx)))
     const pubicArch = (1 - ty) * anteriorness
     const ischial = (1 - ty) * (1 - anteriorness)
-    sx = 1.18 + 0.1 * iliacFlare + 0.16 * pubicArch * Math.min(1, Math.abs(nx)) + 0.06 * ischial
-    if (ctx.family === 'sacrum') sx = 1.14 - 0.04 * ty
-    p.y = ctx.pelvisMinY + (p.y - ctx.pelvisMinY) * (1 - 0.07 * smoothstep(0.35, 1, ty))
+    sx = 1.28 + 0.14 * iliacFlare + 0.2 * pubicArch * Math.min(1, Math.abs(nx)) + 0.08 * ischial
+    if (ctx.family === 'sacrum') sx = 1.22 - 0.04 * ty
+    p.y = ctx.pelvisMinY + (p.y - ctx.pelvisMinY) * (1 - 0.08 * smoothstep(0.35, 1, ty))
+  } else if (ctx.family === 'femur') {
+    const u = clamp01((t - 0.26) / 0.28)
+    sx = 0.9 + 0.34 * u
+  } else if (ctx.family === 'shin' || ctx.family === 'foot') {
+    sx = 0.9
   } else if (ctx.family === 'skull' || ctx.family === 'mandible') {
     p.sub(ctx.skullCenter)
     p.multiplyScalar(ctx.family === 'mandible' ? 0.92 : 0.95)
     p.add(ctx.skullCenter)
     sx = ctx.family === 'mandible' ? 0.92 : 1
   } else if (ctx.family === 'thorax' || ctx.family === 'sternum') {
-    sx = 0.88 + 0.04 * (1 - t)
-    p.z = ctx.midZ + (p.z - ctx.midZ) * 0.93
+    sx = 0.84 + 0.04 * (1 - t)
+    p.z = ctx.midZ + (p.z - ctx.midZ) * 0.92
+  } else if (ctx.family === 'lumbar' || ctx.family === 'cervical') {
+    sx = 0.92
   }
 
   p.x = ctx.midX + (p.x - ctx.midX) * sx
