@@ -1,6 +1,5 @@
 import {
   Box3,
-  Color,
   Mesh,
   MeshStandardMaterial,
   Object3D,
@@ -10,6 +9,7 @@ import {
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { isTinyFragmentName } from '../data/joints'
+import { createBoneMaterial } from './boneShade'
 
 export interface BoneMesh extends Mesh {
   userData: {
@@ -47,11 +47,7 @@ export function collectBoneMeshes(root: Object3D): BoneMesh[] {
 }
 
 export function applyBoneMaterial(bones: BoneMesh[]): MeshStandardMaterial {
-  const material = new MeshStandardMaterial({
-    color: new Color('#e6d5b8'),
-    roughness: 0.58,
-    metalness: 0.04,
-  })
+  const material = createBoneMaterial()
 
   for (const bone of bones) {
     bone.userData.originalMaterial = bone.material

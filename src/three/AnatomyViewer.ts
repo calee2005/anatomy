@@ -22,6 +22,7 @@ import {
   loadBodyGltf,
   type BoneMesh,
 } from './loadSkeleton'
+import { cloneShadedBoneMaterial, updateBoneShade } from './boneShade'
 import {
   eulerFromOffset,
   OrthoGimbal,
@@ -210,6 +211,7 @@ export class AnatomyViewer {
   private loop = (): void => {
     this.raf = requestAnimationFrame(this.loop)
     if (this.gimbal.group.visible) this.gimbal.setCenter(this.bundle.orbit.target)
+    this.syncBoneShade?.()
     this.bundle.orbit.update()
     this.bundle.renderer.render(this.bundle.scene, this.bundle.camera)
   }
@@ -300,7 +302,7 @@ export class AnatomyViewer {
 
     const base = this.boneMaterial
     if (!base) return
-    const highlightMat = base.clone()
+    const highlightMat = cloneShadedBoneMaterial(base)
     highlightMat.emissive.copy(HIGHLIGHT)
     highlightMat.emissiveIntensity = 0.42
     mesh.material = highlightMat
@@ -492,6 +494,33 @@ export class AnatomyViewer {
     this.bundle.orbit.dispose()
     this.bundle.renderer.dispose()
     this.bundle.renderer.domElement.remove()
+  }
+
+  private syncBoneShade(): void {
+    if (!this.boneMaterial || !this.rig) return
+    _box.makeEmpty()
+    const thorax = this.rig.joints.get('thorax')
+    const sternum = this.rig.joints.get('sternum')
+    if (thorax) {
+      for (const bone of thorax.bones) _box.expandByObject(bone)
+    }
+    if (sternum) {
+      for (const bone of sternum.bones) _box.expandByObject(bone)
+    }
+    if (_box.isEmpty()) {
+      _center.copy(this.bundle.orbit.target)
+      _sphere.radius = this.girdleRadius
+    } else {
+      _box.getCenter(_center)
+      _box.getBoundingSphere(_sphere)
+    }
+    updateBoneShade(
+      this.boneMaterial,
+      this.bundle.camera,
+      this.bundle.orbit.target,
+      _center,
+      Math.max(_sphere.radius, this.girdleRadius, 0.06),
+    )
   }
 
   private applyAxisDelta(axis: GimbalAxis, delta: number): void {
