@@ -228,6 +228,39 @@ function onCell(i: number, j: number) {
   gap: 8px;
   font-size: 12px;
   color: #d7d3cc;
+  cursor: pointer;
+}
+
+.check input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: 0 0 14px;
+  border: 1px solid #6a6e78;
+  border-radius: 3px;
+  background: #121318;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.check input:hover {
+  border-color: #8b8680;
+}
+
+.check input:checked {
+  background: #3d4a3a;
+  border-color: #8faf7a;
+}
+
+.check input:checked::after {
+  content: '';
+  width: 7px;
+  height: 4px;
+  border-left: 2px solid #e7f0d8;
+  border-bottom: 2px solid #e7f0d8;
+  transform: translateY(-1px) rotate(-45deg);
 }
 
 .row,
