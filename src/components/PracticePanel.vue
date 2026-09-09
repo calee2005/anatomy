@@ -28,6 +28,16 @@ watch(
   },
 )
 
+const girdleOnly = computed({
+  get: () => props.practice.girdleOnly,
+  set: (on: boolean) => emit('girdleOnly', on),
+})
+
+const gimbalVisible = computed({
+  get: () => props.practice.gimbalVisible,
+  set: (on: boolean) => emit('gimbalVisible', on),
+})
+
 const cells = computed(() => {
   const { n, m } = props.practice.grid
   const list: { i: number; j: number; key: string }[] = []
@@ -80,19 +90,11 @@ function onCell(i: number, j: number) {
     </p>
 
     <label class="check">
-      <input
-        type="checkbox"
-        :checked="practice.girdleOnly"
-        @click.prevent="emit('girdleOnly', !practice.girdleOnly)"
-      />
+      <input type="checkbox" v-model="girdleOnly" />
       只看胸腔、脊椎、锁骨、肩胛骨
     </label>
     <label class="check">
-      <input
-        type="checkbox"
-        :checked="practice.gimbalVisible"
-        @click.prevent="emit('gimbalVisible', !practice.gimbalVisible)"
-      />
+      <input type="checkbox" v-model="gimbalVisible" />
       显示正交导轨
     </label>
 
@@ -226,6 +228,39 @@ function onCell(i: number, j: number) {
   gap: 8px;
   font-size: 12px;
   color: #d7d3cc;
+  cursor: pointer;
+}
+
+.check input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: 0 0 14px;
+  border: 1px solid #6a6e78;
+  border-radius: 3px;
+  background: #121318;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.check input:hover {
+  border-color: #8b8680;
+}
+
+.check input:checked {
+  background: #3d4a3a;
+  border-color: #8faf7a;
+}
+
+.check input:checked::after {
+  content: '';
+  width: 7px;
+  height: 4px;
+  border-left: 2px solid #e7f0d8;
+  border-bottom: 2px solid #e7f0d8;
+  transform: translateY(-1px) rotate(-45deg);
 }
 
 .row,
