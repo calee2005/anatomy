@@ -7,7 +7,6 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
-  Plane,
   Quaternion,
   Raycaster,
   SphereGeometry,
@@ -37,33 +36,18 @@ interface AxisVisual {
 }
 
 const _pointer = new Vector2()
-const _hit = new Vector3()
-const _plane = new Plane()
-const _v = new Vector3()
-const _u = new Vector3()
-const _w = new Vector3()
 const _axis = new Vector3()
 const _q = new Quaternion()
-const _from = new Vector3()
 const _euler = new Euler()
 const _m = new Matrix4()
 const _x = new Vector3()
 const _y = new Vector3()
 const _z = new Vector3()
-
-function basisOnPlane(axis: Vector3, outU: Vector3, outW: Vector3): void {
-  const ref = Math.abs(axis.y) < 0.9 ? _from.set(0, 1, 0) : _from.set(1, 0, 0)
-  outU.crossVectors(axis, ref).normalize()
-  outW.crossVectors(axis, outU).normalize()
-}
-
-function angleOnPlane(point: Vector3, center: Vector3, axis: Vector3): number {
-  _v.copy(point).sub(center).projectOnPlane(axis)
-  if (_v.lengthSq() < 1e-12) return 0
-  _v.normalize()
-  basisOnPlane(axis, _u, _w)
-  return Math.atan2(_v.dot(_w), _v.dot(_u))
-}
+const _eye = new Vector3()
+const _tangent = new Vector3()
+const _ndc0 = new Vector3()
+const _ndc1 = new Vector3()
+const _lastNdc = new Vector2()
 
 function pointerFromEvent(event: PointerEvent, canvas: HTMLElement, out: Vector2): void {
   const rect = canvas.getBoundingClientRect()
@@ -81,7 +65,7 @@ export class OrthoGimbal {
   private readonly beadGeo: SphereGeometry
   private radius = 0.25
   private grid: ViewGrid = { n: 8, m: 8, k: 4 }
-  private drag: { axis: GimbalAxis; lastAngle: number } | null = null
+  private drag: { axis: GimbalAxis; lastPointer: Vector2 } | null = null
 
   constructor() {
     this.group.name = 'OrthoGimbal'
@@ -159,9 +143,8 @@ export class OrthoGimbal {
     camera: Camera,
     axis: GimbalAxis,
   ): boolean {
-    const angle = this.pointerAngle(event, canvas, camera, axis)
-    if (angle === null) return false
-    this.drag = { axis, lastAngle: angle }
+    pointerFromEvent(event, canvas, _pointer)
+    this.drag = { axis, lastPointer: _pointer.clone() }
     this.setHovered(axis)
     return true
   }
@@ -172,13 +155,41 @@ export class OrthoGimbal {
     camera: Camera,
   ): { axis: GimbalAxis; delta: number } | null {
     if (!this.drag) return null
-    const angle = this.pointerAngle(event, canvas, camera, this.drag.axis)
-    if (angle === null) return null
-    let delta = angle - this.drag.lastAngle
-    if (delta > Math.PI) delta -= Math.PI * 2
-    if (delta < -Math.PI) delta += Math.PI * 2
-    this.drag.lastAngle = angle
-    return { axis: this.drag.axis, delta }
+    pointerFromEvent(event, canvas, _pointer)
+    const axis = this.drag.axis
+    _axis.copy(this.visuals.find((v) => v.axis === axis)!.worldAxis)
+    _eye.subVectors(camera.position, this.group.position)
+    if (_eye.lengthSq() < 1e-10) return null
+    _eye.normalize()
+    _lastNdc.copy(this.drag.lastPointer)
+    const dx = _pointer.x - _lastNdc.x
+    const dy = _pointer.y - _lastNdc.y
+    this.drag.lastPointer.copy(_pointer)
+    _tangent.crossVectors(_axis, _eye)
+    let delta = 0
+    if (_tangent.lengthSq() < 0.04) {
+      _ndc0.copy(this.group.position).project(camera)
+      const lx = _lastNdc.x - _ndc0.x
+      const ly = _lastNdc.y - _ndc0.y
+      const cx = _pointer.x - _ndc0.x
+      const cy = _pointer.y - _ndc0.y
+      const lastLen = Math.hypot(lx, ly)
+      const currLen = Math.hypot(cx, cy)
+      if (lastLen < 1e-5 || currLen < 1e-5) return null
+      const facing = Math.sign(_eye.dot(_axis)) || 1
+      delta = -Math.atan2(lx * cy - ly * cx, lx * cx + ly * cy) * facing
+    } else {
+      _tangent.normalize()
+      _ndc0.copy(this.group.position).project(camera)
+      _ndc1.copy(this.group.position).addScaledVector(_tangent, this.radius).project(camera)
+      const sx = _ndc1.x - _ndc0.x
+      const sy = _ndc1.y - _ndc0.y
+      const lenSq = sx * sx + sy * sy
+      if (lenSq < 1e-10) return null
+      delta = -(dx * sx + dy * sy) / lenSq
+    }
+    if (Math.abs(delta) < 1e-6) return null
+    return { axis, delta }
   }
 
   endDrag(): void {
@@ -207,20 +218,6 @@ export class OrthoGimbal {
     }
     this.tickGeo.dispose()
     this.beadGeo.dispose()
-  }
-
-  private pointerAngle(
-    event: PointerEvent,
-    canvas: HTMLElement,
-    camera: Camera,
-    axis: GimbalAxis,
-  ): number | null {
-    pointerFromEvent(event, canvas, _pointer)
-    this.raycaster.setFromCamera(_pointer, camera)
-    _axis.copy(this.visuals.find((v) => v.axis === axis)!.worldAxis)
-    _plane.setFromNormalAndCoplanarPoint(_axis, this.group.position)
-    if (!this.raycaster.ray.intersectPlane(_plane, _hit)) return null
-    return angleOnPlane(_hit, this.group.position, _axis)
   }
 
   private makeAxis(axis: GimbalAxis, worldAxis: Vector3, rotX: number, rotY: number): AxisVisual {
