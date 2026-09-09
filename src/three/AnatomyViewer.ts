@@ -200,8 +200,26 @@ export class AnatomyViewer {
     }
   }
 
-  get bodySex(): BodySex {
-    return this.sex
+  get bodyProportions(): { hip: number; shoulder: number; ratio: number } | null {
+    if (!this.rig) return null
+    _box.makeEmpty()
+    const pelvis = this.rig.joints.get('pelvis')
+    if (pelvis) {
+      for (const bone of pelvis.bones) _box.expandByObject(bone)
+    }
+    const hip = _box.isEmpty() ? 0 : _box.max.x - _box.min.x
+    _box.makeEmpty()
+    for (const id of ['clavicle_L', 'clavicle_R', 'scapula_L', 'scapula_R'] as const) {
+      const joint = this.rig.joints.get(id)
+      if (!joint) continue
+      for (const bone of joint.bones) _box.expandByObject(bone)
+    }
+    const shoulder = _box.isEmpty() ? 0 : _box.max.x - _box.min.x
+    return {
+      hip,
+      shoulder,
+      ratio: shoulder > 1e-6 ? hip / shoulder : 0,
+    }
   }
 
   private async load(): Promise<void> {

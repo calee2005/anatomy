@@ -42,9 +42,12 @@ const practice = ref<PracticeState>({
 })
 
 function idleStatus() {
+  const sex = BODY_SEX_LABEL[bodySex.value]
+  const props = viewer.value?.bodyProportions
+  const ratio = props ? `，髋/肩 ${props.ratio.toFixed(2)}` : ''
   return bodySex.value === 'female'
-    ? '女性骨骼：骨盆更宽、肩更窄；点选关节后拖动坐标轴摆姿势'
-    : '拖动旋转视角；点选整组关节后拖动坐标轴摆姿势'
+    ? `${sex}骨骼：骨盆更宽、肩更窄${ratio}`
+    : `${sex}骨骼${ratio}；拖动旋转视角，点选关节后拖动坐标轴摆姿势`
 }
 
 onMounted(() => {
