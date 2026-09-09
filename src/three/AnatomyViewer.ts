@@ -223,7 +223,7 @@ export class AnatomyViewer {
     if (!this.practice || !this.gimbal.group.visible) return
     const hit = this.gimbal.hitTest(event, this.bundle.renderer.domElement, this.bundle.camera)
     if (!hit) return
-    if (!this.gimbal.beginDrag(event, this.bundle.renderer.domElement, this.bundle.camera, hit.axis)) {
+    if (!this.gimbal.beginDrag(event, this.bundle.renderer.domElement, hit.axis)) {
       return
     }
     this.gimbalHeld = true
