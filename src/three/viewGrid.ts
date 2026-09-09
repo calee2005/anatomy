@@ -96,6 +96,15 @@ export function stepCell(grid: ViewGrid, cell: ViewCell, delta: number): ViewCel
   return cellFromLinear(grid, linearIndex(grid, cell) + delta)
 }
 
+export function randomCell(grid: ViewGrid, current?: ViewCell): ViewCell {
+  const total = cellCount(grid)
+  if (total <= 1) return cellFromLinear(grid, 0)
+  const now = current ? linearIndex(grid, current) : -1
+  let next = Math.floor(Math.random() * total)
+  if (next === now) next = (next + 1) % total
+  return cellFromLinear(grid, next)
+}
+
 export function parseCellToken(raw: string, grid: ViewGrid): ViewCell | null {
   const parts = raw
     .trim()

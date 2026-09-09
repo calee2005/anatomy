@@ -46,6 +46,7 @@ import {
   eulerFromCell,
   formatCell,
   linearIndex,
+  randomCell,
   stepCell,
   type GimbalAxis,
   type OrbitEuler,
@@ -472,6 +473,10 @@ export class AnatomyViewer {
 
   stepPractice(delta: number): void {
     this.goToCell(stepCell(this.grid, cellFromEuler(this.grid, this.euler), delta))
+  }
+
+  randomPractice(): void {
+    this.goToCell(randomCell(this.grid, cellFromEuler(this.grid, this.euler)))
   }
 
   dispose(): void {

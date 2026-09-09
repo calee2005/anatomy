@@ -14,6 +14,7 @@ const emit = defineEmits<{
   go: [i: number, j: number, l: number]
   snap: []
   step: [delta: number]
+  random: []
 }>()
 
 const token = ref(props.practice.token)
@@ -162,6 +163,7 @@ function onCell(i: number, j: number) {
 
     <div class="nav">
       <button type="button" @click="emit('step', -1)">上一视角</button>
+      <button type="button" @click="emit('random')">随机视角</button>
       <button type="button" @click="emit('snap')">吸附网格</button>
       <button type="button" @click="emit('step', 1)">下一视角</button>
     </div>
@@ -227,7 +229,11 @@ function onCell(i: number, j: number) {
 }
 
 .row,
-.nav,
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 .token,
 .krow {
   display: flex;

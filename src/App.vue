@@ -205,6 +205,7 @@ async function onPhotoFile(event: Event) {
           @go="(i, j, l) => viewer?.goToCell({ i, j, l })"
           @snap="viewer?.snapToGrid()"
           @step="(delta) => viewer?.stepPractice(delta)"
+          @random="viewer?.randomPractice()"
         />
       </SidePanel>
     </div>
