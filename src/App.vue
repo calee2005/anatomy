@@ -46,8 +46,8 @@ function idleStatus() {
   const props = viewer.value?.bodyProportions
   const ratio = props ? `，髋/肩 ${props.ratio.toFixed(2)}` : ''
   return bodySex.value === 'female'
-    ? `${sex}骨骼：骨盆更宽、肩更窄${ratio}`
-    : `${sex}骨骼${ratio}；拖动旋转视角，点选关节后拖动坐标轴摆姿势`
+    ? `${sex}骨骼：骨盆更宽、肩更窄${ratio}；拖动旋转，Shift / 右键 / 中键拖动平移`
+    : `${sex}骨骼${ratio}；拖动旋转，Shift / 右键 / 中键拖动平移，点选关节后拖动坐标轴摆姿势`
 }
 
 onMounted(() => {
@@ -201,7 +201,11 @@ async function onPhotoFile(event: Event) {
 
     <div class="main">
       <div class="stage">
-        <div ref="viewport" class="viewport" />
+        <div
+          ref="viewport"
+          class="viewport"
+          title="左键拖动旋转；Shift、右键或中键拖动平移；滚轮缩放"
+        />
         <div
           v-if="status.startsWith('正在加载') || status.startsWith('加载模型') || status.startsWith('正在切换')"
           class="loading"
@@ -291,6 +295,8 @@ async function onPhotoFile(event: Event) {
 .viewport {
   position: absolute;
   inset: 0;
+  user-select: none;
+  touch-action: none;
 }
 
 .loading {

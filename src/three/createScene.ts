@@ -4,6 +4,7 @@ import {
   DirectionalLight,
   Euler,
   HemisphereLight,
+  MOUSE,
   OrthographicCamera,
   PerspectiveCamera,
   Raycaster,
@@ -91,13 +92,17 @@ export function createScene(container: HTMLElement): SceneBundle {
   const orbit = new TrackballControls(persp, renderer.domElement)
   orbit.rotateSpeed = 2.0
   orbit.zoomSpeed = 1.35
-  orbit.panSpeed = 0.55
+  orbit.panSpeed = 0.8
   orbit.dynamicDampingFactor = 0.16
   orbit.minDistance = 0.4
   orbit.maxDistance = 8
   orbit.minZoom = 0.28
   orbit.maxZoom = 12
   orbit.keys = ['', '', '']
+  orbit.mouseButtons.LEFT = MOUSE.ROTATE
+  orbit.mouseButtons.MIDDLE = MOUSE.PAN
+  orbit.mouseButtons.RIGHT = MOUSE.PAN
+  orbit.noPan = true
   orbit.target.set(0, 0, 0)
   orbit.handleResize()
 
@@ -216,6 +221,8 @@ type TrackballInternals = TrackballControls & {
   _movePrev: Vector2
   _zoomStart: Vector2
   _zoomEnd: Vector2
+  _panStart: Vector2
+  _panEnd: Vector2
 }
 
 export function settleTrackball(orbit: TrackballControls): void {
@@ -224,6 +231,55 @@ export function settleTrackball(orbit: TrackballControls): void {
   ball._movePrev.copy(ball._moveCurr)
   ball._zoomStart.set(0, 0)
   ball._zoomEnd.copy(ball._zoomStart)
+  ball._panEnd.copy(ball._panStart)
+}
+
+const _panOffset = new Vector3()
+const _camRight = new Vector3()
+const _camUp = new Vector3()
+
+export function isPanPointerEvent(
+  event: PointerEvent,
+  held?: { shift?: boolean; ctrl?: boolean; alt?: boolean; meta?: boolean },
+): boolean {
+  if (event.pointerType === 'touch') return false
+  if (event.button === 1 || event.button === 2) return true
+  if (event.button !== 0) return false
+  return Boolean(
+    event.shiftKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.metaKey ||
+      held?.shift ||
+      held?.ctrl ||
+      held?.alt ||
+      held?.meta,
+  )
+}
+
+/** Screen-space pan: drag the view with the pointer (works for perspective and orthographic). */
+export function panCameraByPixels(bundle: SceneBundle, dx: number, dy: number): void {
+  if (dx === 0 && dy === 0) return
+  const camera = bundle.camera
+  const height = Math.max(bundle.renderer.domElement.clientHeight, 1)
+  camera.updateMatrixWorld()
+  _camRight.setFromMatrixColumn(camera.matrixWorld, 0)
+  _camUp.setFromMatrixColumn(camera.matrixWorld, 1)
+
+  let worldHeight: number
+  if (bundle.cameraKind === 'orthographic') {
+    worldHeight = (bundle.ortho.top - bundle.ortho.bottom) / Math.max(bundle.ortho.zoom, 1e-6)
+  } else {
+    const distance = camera.position.distanceTo(bundle.orbit.target)
+    const fov = (bundle.persp.fov * Math.PI) / 180
+    worldHeight = 2 * Math.tan(fov / 2) * distance
+  }
+
+  const pixel = worldHeight / height
+  _panOffset.copy(_camRight).multiplyScalar(-dx * pixel)
+  _panOffset.addScaledVector(_camUp, dy * pixel)
+  camera.position.add(_panOffset)
+  bundle.orbit.target.add(_panOffset)
 }
 
 export function dollyCamera(bundle: SceneBundle, zoomIn: boolean): void {
