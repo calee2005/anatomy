@@ -22,7 +22,7 @@ const emit = defineEmits<{
     <slot />
     <section>
       <h2>关节</h2>
-      <p class="hint">点选整组关节或从列表选择，拖动 gizmo 摆姿势。抬臂时肩胛会跟着动；肩胛可切换「平移肩胛」。</p>
+      <p class="hint">点选整组关节或从列表选择，拖动 gizmo 摆姿势。画布：左键旋转，Shift / 右键 / 中键拖动平移。抬臂时肩胛会跟着动；肩胛可切换「平移肩胛」。</p>
       <ul>
         <li v-for="joint in joints" :key="joint.id">
           <button

@@ -8,6 +8,8 @@ import {
   createScene,
   dollyCamera,
   frameTarget,
+  isPanPointerEvent,
+  panCameraByPixels,
   resizeScene,
   setBackground,
   setCameraKind,
@@ -129,6 +131,10 @@ export class AnatomyViewer {
   private pendingHit: { axis: GimbalAxis; tick: number | null } | null = null
   private girdleRadius = 0.2
   private canvasDown = false
+  private panning = false
+  private panLast = { x: 0, y: 0 }
+  private readonly onContextMenu: (event: Event) => void
+  private readonly onPanPointerDown: (event: PointerEvent) => void
   private sourceModel: Object3D | null = null
   private sex: BodySex = 'male'
   private readonly rigCache = new Map<BodySex, { rig: SkeletonRig; material: MeshStandardMaterial }>()
@@ -142,7 +148,7 @@ export class AnatomyViewer {
     this.gimbal.setGrid(this.grid)
     this.bundle.transform.addEventListener('dragging-changed', (event) => {
       this.dragging = Boolean(event.value)
-      this.bundle.orbit.enabled = !event.value && !this.gimbalHeld
+      this.bundle.orbit.enabled = !event.value && !this.gimbalHeld && !this.panning
       if (!event.value) {
         this.clampActiveJoint()
         this.driveShoulderIfNeeded()
@@ -161,10 +167,15 @@ export class AnatomyViewer {
     this.onPointerDown = (event) => this.handlePointerDown(event)
     this.onPointerMove = (event) => this.handlePointerMove(event)
     this.onPointerUp = (event) => this.handlePointerUp(event)
+    this.onPanPointerDown = (event) => this.handlePanPointerDown(event)
+    this.onContextMenu = (event) => event.preventDefault()
     window.addEventListener('resize', this.onResize)
+    this.bundle.renderer.domElement.addEventListener('pointerdown', this.onPanPointerDown, true)
     this.bundle.renderer.domElement.addEventListener('pointerdown', this.onPointerDown)
+    this.bundle.renderer.domElement.addEventListener('contextmenu', this.onContextMenu)
     window.addEventListener('pointermove', this.onPointerMove)
     window.addEventListener('pointerup', this.onPointerUp)
+    window.addEventListener('pointercancel', this.onPointerUp)
 
     this.loop()
     void this.load()
@@ -303,10 +314,36 @@ export class AnatomyViewer {
     this.bundle.renderer.render(this.bundle.scene, this.bundle.camera)
   }
 
+  private handlePanPointerDown(event: PointerEvent): void {
+    if (this.dragging || this.gimbalHeld || this.panning) return
+    if (!isPanPointerEvent(event)) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    this.panning = true
+    this.canvasDown = true
+    this.panLast = { x: event.clientX, y: event.clientY }
+    this.pointerStart = { x: event.clientX, y: event.clientY }
+    this.bundle.orbit.enabled = false
+    settleTrackball(this.bundle.orbit)
+    try {
+      this.bundle.renderer.domElement.setPointerCapture(event.pointerId)
+    } catch {
+      /* pointer already released */
+    }
+    this.bundle.renderer.domElement.style.cursor = 'move'
+  }
+
+  private endPan(): void {
+    if (!this.panning) return
+    this.panning = false
+    this.bundle.orbit.enabled = !this.dragging && !this.gimbalHeld
+    if (!this.gimbalHeld) this.bundle.renderer.domElement.style.cursor = ''
+  }
+
   private handlePointerDown(event: PointerEvent): void {
     this.canvasDown = true
     this.pointerStart = { x: event.clientX, y: event.clientY }
-    if (event.button !== 0 || this.dragging) return
+    if (this.panning || event.button !== 0 || this.dragging) return
     if (!this.practice || !this.gimbal.group.visible) return
     const hit = this.gimbal.hitTest(event, this.bundle.renderer.domElement, this.bundle.camera)
     if (!hit) return
@@ -321,6 +358,13 @@ export class AnatomyViewer {
   }
 
   private handlePointerMove(event: PointerEvent): void {
+    if (this.panning) {
+      const dx = event.clientX - this.panLast.x
+      const dy = event.clientY - this.panLast.y
+      this.panLast = { x: event.clientX, y: event.clientY }
+      panCameraByPixels(this.bundle, dx, dy)
+      return
+    }
     if (this.gimbalHeld) {
       const moved = Math.hypot(event.clientX - this.pointerStart.x, event.clientY - this.pointerStart.y)
       if (moved > 4) this.gimbalMoved = true
@@ -335,6 +379,25 @@ export class AnatomyViewer {
   }
 
   private handlePointerUp(event: PointerEvent): void {
+    if (event.type === 'pointercancel') {
+      this.endPan()
+      if (this.gimbalHeld) {
+        this.gimbal.endDrag()
+        this.gimbalHeld = false
+        this.pendingHit = null
+        this.gimbalMoved = false
+        this.gimbal.setHovered(null)
+      }
+      this.canvasDown = false
+      this.bundle.orbit.enabled = !this.dragging
+      this.bundle.renderer.domElement.style.cursor = ''
+      return
+    }
+    if (this.panning) {
+      this.endPan()
+      this.canvasDown = false
+      return
+    }
     if (this.gimbalHeld) {
       const hit = this.pendingHit
       const moved = this.gimbalMoved
@@ -342,7 +405,7 @@ export class AnatomyViewer {
       this.gimbalHeld = false
       this.pendingHit = null
       this.canvasDown = false
-      this.bundle.orbit.enabled = !this.dragging
+      this.bundle.orbit.enabled = !this.dragging && !this.panning
       this.bundle.renderer.domElement.style.cursor = ''
       this.gimbal.setHovered(null)
       if (!moved && hit?.tick != null) this.snapAxis(hit.axis, hit.tick)
@@ -573,9 +636,12 @@ export class AnatomyViewer {
     cancelAnimationFrame(this.raf)
     this.resizeObserver.disconnect()
     window.removeEventListener('resize', this.onResize)
+    this.bundle.renderer.domElement.removeEventListener('pointerdown', this.onPanPointerDown, true)
     this.bundle.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown)
+    this.bundle.renderer.domElement.removeEventListener('contextmenu', this.onContextMenu)
     window.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('pointerup', this.onPointerUp)
+    window.removeEventListener('pointercancel', this.onPointerUp)
     this.gimbal.dispose()
     for (const { rig, material } of this.rigCache.values()) {
       disposeSkeletonRig(rig)
