@@ -46,7 +46,7 @@ function idleStatus() {
   const props = viewer.value?.bodyProportions
   const ratio = props ? `，髋/肩 ${props.ratio.toFixed(2)}` : ''
   return bodySex.value === 'female'
-    ? `${sex}骨骼：骨盆更宽、肩更窄${ratio}`
+    ? `${sex}骨骼：骨盆更宽、肩更窄${ratio}；拖动旋转，Shift / 右键 / 中键拖动平移`
     : `${sex}骨骼${ratio}；拖动旋转，Shift / 右键 / 中键拖动平移，点选关节后拖动坐标轴摆姿势`
 }
 
