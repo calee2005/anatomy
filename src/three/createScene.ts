@@ -238,13 +238,23 @@ const _panOffset = new Vector3()
 const _camRight = new Vector3()
 const _camUp = new Vector3()
 
-export function isPanPointerEvent(event: PointerEvent): boolean {
+export function isPanPointerEvent(
+  event: PointerEvent,
+  held?: { shift?: boolean; ctrl?: boolean; alt?: boolean; meta?: boolean },
+): boolean {
   if (event.pointerType === 'touch') return false
   if (event.button === 1 || event.button === 2) return true
-  if (event.button === 0 && (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey)) {
-    return true
-  }
-  return false
+  if (event.button !== 0) return false
+  return Boolean(
+    event.shiftKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.metaKey ||
+      held?.shift ||
+      held?.ctrl ||
+      held?.alt ||
+      held?.meta,
+  )
 }
 
 /** Screen-space pan: drag the view with the pointer (works for perspective and orthographic). */

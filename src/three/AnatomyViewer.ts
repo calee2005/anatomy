@@ -133,8 +133,11 @@ export class AnatomyViewer {
   private canvasDown = false
   private panning = false
   private panLast = { x: 0, y: 0 }
+  private panMods = { shift: false, ctrl: false, alt: false, meta: false }
   private readonly onContextMenu: (event: Event) => void
   private readonly onPanPointerDown: (event: PointerEvent) => void
+  private readonly onPanKey: (event: KeyboardEvent) => void
+  private readonly onWindowBlur: () => void
   private sourceModel: Object3D | null = null
   private sex: BodySex = 'male'
   private readonly rigCache = new Map<BodySex, { rig: SkeletonRig; material: MeshStandardMaterial }>()
@@ -169,6 +172,16 @@ export class AnatomyViewer {
     this.onPointerUp = (event) => this.handlePointerUp(event)
     this.onPanPointerDown = (event) => this.handlePanPointerDown(event)
     this.onContextMenu = (event) => event.preventDefault()
+    this.onPanKey = (event) => {
+      const down = event.type === 'keydown'
+      if (event.key === 'Shift') this.panMods.shift = down
+      else if (event.key === 'Control') this.panMods.ctrl = down
+      else if (event.key === 'Alt') this.panMods.alt = down
+      else if (event.key === 'Meta') this.panMods.meta = down
+    }
+    this.onWindowBlur = () => {
+      this.panMods = { shift: false, ctrl: false, alt: false, meta: false }
+    }
     window.addEventListener('resize', this.onResize)
     this.bundle.renderer.domElement.addEventListener('pointerdown', this.onPanPointerDown, true)
     this.bundle.renderer.domElement.addEventListener('pointerdown', this.onPointerDown)
@@ -176,6 +189,9 @@ export class AnatomyViewer {
     window.addEventListener('pointermove', this.onPointerMove)
     window.addEventListener('pointerup', this.onPointerUp)
     window.addEventListener('pointercancel', this.onPointerUp)
+    window.addEventListener('keydown', this.onPanKey)
+    window.addEventListener('keyup', this.onPanKey)
+    window.addEventListener('blur', this.onWindowBlur)
 
     this.loop()
     void this.load()
@@ -316,7 +332,7 @@ export class AnatomyViewer {
 
   private handlePanPointerDown(event: PointerEvent): void {
     if (this.dragging || this.gimbalHeld || this.panning) return
-    if (!isPanPointerEvent(event)) return
+    if (!isPanPointerEvent(event, this.panMods)) return
     event.preventDefault()
     event.stopImmediatePropagation()
     this.panning = true
@@ -642,6 +658,9 @@ export class AnatomyViewer {
     window.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('pointerup', this.onPointerUp)
     window.removeEventListener('pointercancel', this.onPointerUp)
+    window.removeEventListener('keydown', this.onPanKey)
+    window.removeEventListener('keyup', this.onPanKey)
+    window.removeEventListener('blur', this.onWindowBlur)
     this.gimbal.dispose()
     for (const { rig, material } of this.rigCache.values()) {
       disposeSkeletonRig(rig)
